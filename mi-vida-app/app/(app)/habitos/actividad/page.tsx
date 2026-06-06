@@ -16,14 +16,38 @@ function inicioSemana() {
 export default function ActividadPage() {
   const supabase = createClient();
   const [acts, setActs] = useState<Act[]>([]);
+  const [pesoPerfil, setPesoPerfil] = useState<number | null>(null);
   const [open, setOpen] = useState(false);
+  const [estimando, setEstimando] = useState(false);
   const [form, setForm] = useState({ fecha: new Date().toISOString().slice(0,10), tipo: "gimnasio", duracion_min: "", pasos: "", calorias_est: "", observaciones: "" });
 
   const load = useCallback(async () => {
     const { data } = await supabase.from("habitos_actividad").select("*").order("fecha", { ascending: false }).limit(60);
     setActs(data ?? []);
+    // último peso registrado, para mejorar la estimación
+    const { data: p } = await supabase.from("peso_registros").select("peso").order("fecha", { ascending: false }).limit(1);
+    if (p && p.length) setPesoPerfil(p[0].peso);
   }, [supabase]);
   useEffect(() => { load(); }, [load]);
+
+  async function estimar() {
+    setEstimando(true);
+    try {
+      const r = await fetch("/api/estimar-calorias-actividad", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          tipo: form.tipo,
+          duracion_min: form.duracion_min ? +form.duracion_min : null,
+          pasos: form.pasos ? +form.pasos : null,
+          peso: pesoPerfil,
+          observaciones: form.observaciones,
+        }),
+      });
+      const j = await r.json();
+      if (j.calorias != null) setForm((f) => ({ ...f, calorias_est: String(j.calorias) }));
+      else if (j.error) alert("Error: " + j.error);
+    } finally { setEstimando(false); }
+  }
 
   async function guardar() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -81,8 +105,11 @@ export default function ActividadPage() {
             <Field label="Duración (min)"><Input type="number" value={form.duracion_min} onChange={(e) => setForm({ ...form, duracion_min: e.target.value })} /></Field>
             <Field label="Pasos"><Input type="number" value={form.pasos} onChange={(e) => setForm({ ...form, pasos: e.target.value })} /></Field>
           </div>
-          <Field label="Calorías estimadas"><Input type="number" value={form.calorias_est} onChange={(e) => setForm({ ...form, calorias_est: e.target.value })} /></Field>
           <Field label="Observaciones"><Textarea value={form.observaciones} onChange={(e) => setForm({ ...form, observaciones: e.target.value })} /></Field>
+          <Button variant="soft" className="w-full" onClick={estimar} disabled={estimando || (!form.duracion_min && !form.pasos)}>
+            {estimando ? "Estimando…" : "✨ Estimar calorías con IA"}
+          </Button>
+          <Field label="Calorías gastadas"><Input type="number" value={form.calorias_est} onChange={(e) => setForm({ ...form, calorias_est: e.target.value })} /></Field>
           <Button className="w-full" onClick={guardar}>Guardar</Button>
         </div>
       </Sheet>
