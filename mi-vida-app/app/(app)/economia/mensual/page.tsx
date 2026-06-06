@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { formatARS } from "@/lib/format";
+import { formatARS, parseAR } from "@/lib/format";
 import { Card, Button, Field, Input, Select, Sheet, SectionTitle } from "@/components/ui";
 
 type Cat = { id: string; ambito: string; nombre: string };
@@ -157,19 +157,22 @@ export default function MensualPage() {
 }
 
 function FilaMobile({ nombre, value, sub, onChange }: { nombre: string; value: number; sub?: string; onChange: (v: number) => void }) {
-  const [v, setV] = useState(String(value || ""));
-  useEffect(() => { setV(value ? String(value) : ""); }, [value]);
+  const [focused, setFocused] = useState(false);
+  const [raw, setRaw] = useState("");
+  useEffect(() => { if (!focused) setRaw(value ? String(value).replace(".", ",") : ""); }, [value, focused]);
+  const display = focused ? raw : (value ? formatARS(value) : "");
   return (
     <div className="flex items-center justify-between py-2.5">
       <div>
         <div className="text-sm font-medium">{nombre}</div>
         {sub && <div className="text-xs" style={{ color: "var(--text-muted)" }}>{sub}</div>}
       </div>
-      <input type="number" inputMode="decimal" value={v}
-        onChange={(e) => setV(e.target.value)}
-        onBlur={() => onChange(parseFloat(v) || 0)}
-        placeholder="0"
-        className="w-28 rounded-lg border bg-surface px-2 py-1.5 text-right text-sm"
+      <input inputMode="decimal" value={display}
+        onFocus={() => { setFocused(true); setRaw(value ? String(value).replace(".", ",") : ""); }}
+        onChange={(e) => setRaw(e.target.value.replace(/[^\d,-]/g, ""))}
+        onBlur={() => { setFocused(false); onChange(parseAR(raw)); }}
+        placeholder="$ 0,00"
+        className="w-32 rounded-lg border bg-surface px-2 py-1.5 text-right text-sm"
         style={{ borderColor: "var(--border)", color: "var(--text)" }} />
     </div>
   );
