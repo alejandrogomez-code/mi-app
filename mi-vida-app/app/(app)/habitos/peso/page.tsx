@@ -42,8 +42,10 @@ export default function PesoPage() {
 
   useEffect(() => { load(); }, [load]);
 
+  // Altura efectiva: la del perfil, o la tipeada en el sheet si todavía no se guardó.
   const altura: number | null = profile?.altura_cm ?? (obj.altura_cm ? parseFloat(obj.altura_cm) : null);
 
+  // IMC AL VUELO: no depende de lo guardado. Si hay altura, siempre calcula.
   function imcDe(peso: number): number | null {
     return altura ? calcIMC(peso, altura) : null;
   }
@@ -74,6 +76,7 @@ export default function PesoPage() {
       sexo: obj.sexo,
     }).eq("user_id", user.id);
     if (error) { alert("No se pudo guardar: " + error.message); return; }
+    // Recalcula y persiste el IMC de todos los registros con la nueva altura.
     if (alturaNum) {
       for (const r of regs) {
         const imc = calcIMC(r.peso, alturaNum);
