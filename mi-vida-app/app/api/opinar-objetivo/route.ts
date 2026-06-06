@@ -6,6 +6,7 @@ export const maxDuration = 60;
 
 const anthropic = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 
+// Body: { pesoActual, pesoObjetivo, fechaObjetivo, altura, edad, sexo, nivel }
 export async function POST(req: NextRequest) {
   try {
     const { pesoActual, pesoObjetivo, fechaObjetivo, altura, edad, sexo, nivel } = await req.json();
