@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { formatARS, mesActual, nombreMes } from "@/lib/format";
+import { formatARS, mesActual, nombreMes, parseAR } from "@/lib/format";
 import { Card, Button, Field, Input, Select, Sheet, Empty, StatTile, SectionTitle, Badge } from "@/components/ui";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 
 type Cuenta = { id: string; nombre: string; tipo: string; saldo_actual: number };
 type Cat = { id: string; ambito: string; nombre: string };
@@ -163,7 +164,7 @@ export default function SituacionPage() {
           <Field label="Tipo"><Select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value, categoria_id: "" })}><option value="ingreso">Ingreso</option><option value="gasto">Gasto</option><option value="ahorro">Ahorro</option><option value="transferencia">Transferencia</option></Select></Field>
           <Field label="Cuenta"><Select value={form.cuenta_id} onChange={(e) => setForm({ ...form, cuenta_id: e.target.value })}><option value="">—</option>{cuentas.map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</Select></Field>
           <Field label="Categoría"><Select value={form.categoria_id} onChange={(e) => setForm({ ...form, categoria_id: e.target.value })}><option value="">—</option>{catsTipo(form.tipo).map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</Select></Field>
-          <Field label="Importe"><Input type="number" inputMode="decimal" value={form.importe} onChange={(e) => setForm({ ...form, importe: e.target.value })} /></Field>
+          <Field label="Importe"><MoneyInput value={form.importe ? parseAR(form.importe) : 0} onChangeValue={(n) => setForm({ ...form, importe: String(n) })} /></Field>
           <Field label="Observación"><Input value={form.observacion} onChange={(e) => setForm({ ...form, observacion: e.target.value })} /></Field>
           <Button className="w-full" onClick={guardarMov}>Guardar</Button>
         </div>
@@ -173,7 +174,7 @@ export default function SituacionPage() {
         <div className="space-y-3">
           <Field label="Nombre"><Input value={ctaForm.nombre} onChange={(e) => setCtaForm({ ...ctaForm, nombre: e.target.value })} placeholder="Ej: Banco Galicia" /></Field>
           <Field label="Tipo"><Select value={ctaForm.tipo} onChange={(e) => setCtaForm({ ...ctaForm, tipo: e.target.value })}><option value="cuenta">Cuenta</option><option value="ahorro">Ahorro / Inversión</option></Select></Field>
-          <Field label="Saldo actual"><Input type="number" value={ctaForm.saldo_actual} onChange={(e) => setCtaForm({ ...ctaForm, saldo_actual: e.target.value })} /></Field>
+          <Field label="Saldo actual"><MoneyInput value={ctaForm.saldo_actual ? parseAR(ctaForm.saldo_actual) : 0} onChangeValue={(n) => setCtaForm({ ...ctaForm, saldo_actual: String(n) })} /></Field>
           <Button className="w-full" onClick={guardarCta}>Crear</Button>
         </div>
       </Sheet>
@@ -184,15 +185,15 @@ export default function SituacionPage() {
 function EditableSaldo({ cuenta, onSaved }: { cuenta: Cuenta; onSaved: () => void }) {
   const supabase = createClient();
   const [editing, setEditing] = useState(false);
-  const [val, setVal] = useState(String(cuenta.saldo_actual ?? 0));
+  const [val, setVal] = useState(String(cuenta.saldo_actual ?? 0).replace(".", ","));
   async function save() {
-    await supabase.from("cuentas").update({ saldo_actual: parseFloat(val) || 0 }).eq("id", cuenta.id);
+    await supabase.from("cuentas").update({ saldo_actual: parseAR(val) }).eq("id", cuenta.id);
     setEditing(false); onSaved();
   }
   if (editing) return (
     <div className="flex items-center gap-1">
-      <input className="w-28 rounded-lg border bg-surface px-2 py-1 text-sm" style={{ borderColor: "var(--border)", color: "var(--text)" }}
-        type="number" value={val} onChange={(e) => setVal(e.target.value)} autoFocus />
+      <input className="w-32 rounded-lg border bg-surface px-2 py-1 text-right text-sm" style={{ borderColor: "var(--border)", color: "var(--text)" }}
+        inputMode="decimal" value={val} onChange={(e) => setVal(e.target.value.replace(/[^\d,-]/g, ""))} autoFocus />
       <button onClick={save} style={{ color: "var(--ok)" }}>✓</button>
     </div>
   );
