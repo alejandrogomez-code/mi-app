@@ -2,12 +2,6 @@
 import { useEffect, useState } from "react";
 import { formatARS, parseAR } from "@/lib/format";
 
-/**
- * Input de dinero estilo AR.
- * - Con foco: muestra el número crudo editable (coma decimal: 164145,40).
- * - Sin foco (blur): muestra "$ 164.145,40".
- * - onChangeValue devuelve siempre el number real.
- */
 export function MoneyInput({
   value,
   onChangeValue,
@@ -25,16 +19,10 @@ export function MoneyInput({
   const [raw, setRaw] = useState("");
 
   useEffect(() => {
-    if (!focused) {
-      setRaw(value ? String(value).replace(".", ",") : "");
-    }
+    if (!focused) setRaw(value ? String(value).replace(".", ",") : "");
   }, [value, focused]);
 
-  const display = focused
-    ? raw
-    : value || value === 0
-    ? formatARS(value)
-    : "";
+  const display = focused ? raw : (value || value === 0 ? formatARS(value) : "");
 
   return (
     <input
@@ -43,18 +31,9 @@ export function MoneyInput({
       style={{ borderColor: "var(--border)", color: "var(--text)" }}
       placeholder={focused ? placeholder : `$ ${placeholder}`}
       value={display}
-      onFocus={() => {
-        setFocused(true);
-        setRaw(value ? String(value).replace(".", ",") : "");
-      }}
-      onChange={(e) => {
-        const v = e.target.value.replace(/[^\d,-]/g, "");
-        setRaw(v);
-      }}
-      onBlur={() => {
-        setFocused(false);
-        onChangeValue(parseAR(raw));
-      }}
+      onFocus={() => { setFocused(true); setRaw(value ? String(value).replace(".", ",") : ""); }}
+      onChange={(e) => setRaw(e.target.value.replace(/[^\d,-]/g, ""))}
+      onBlur={() => { setFocused(false); onChangeValue(parseAR(raw)); }}
     />
   );
 }
