@@ -84,10 +84,18 @@ export function Sheet({ open, onClose, title, children }:
 }
 
 export function StatTile({ label, value, sub, tone }: { label: string; value: string; sub?: string; tone?: string }) {
+  // Achica la fuente si el número es largo, para que nunca se desborde.
+  const len = value.length;
+  const sizeCls = len > 13 ? "text-base" : len > 10 ? "text-lg" : len > 8 ? "text-xl" : "text-2xl";
   return (
-    <Card className="rise">
+    <Card className="rise overflow-hidden">
       <div className="text-xs font-medium" style={{ color: "var(--text-muted)" }}>{label}</div>
-      <div className="mt-1 font-display text-2xl font-semibold" style={tone ? { color: `var(--${tone})` } : undefined}>{value}</div>
+      <div
+        className={`mt-1 font-display ${sizeCls} font-semibold leading-tight break-words`}
+        style={tone ? { color: `var(--${tone})` } : undefined}
+      >
+        {value}
+      </div>
       {sub && <div className="mt-0.5 text-xs" style={{ color: "var(--text-muted)" }}>{sub}</div>}
     </Card>
   );
