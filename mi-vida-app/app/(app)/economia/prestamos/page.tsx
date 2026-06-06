@@ -1,8 +1,9 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { formatARS, formatFecha } from "@/lib/format";
+import { formatARS, formatFecha, parseAR } from "@/lib/format";
 import { Card, Button, Field, Input, Textarea, Sheet, Empty, StatTile, SectionTitle, Badge } from "@/components/ui";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 
 type Prestamo = { id: string; nombre: string; entidad: string | null; monto_original: number | null; cuotas_total: number | null; observaciones: string | null };
 type Cuota = { id: string; prestamo_id: string; numero: number; vencimiento: string | null; capital: number; interes: number; otros: number; importe_total: number; estado: string };
@@ -132,7 +133,7 @@ export default function PrestamosPage() {
           <Field label="Nombre"><Input value={pForm.nombre} onChange={(e) => setPForm({ ...pForm, nombre: e.target.value })} placeholder="Ej: Préstamo Banco Macro" /></Field>
           <Field label="Entidad"><Input value={pForm.entidad} onChange={(e) => setPForm({ ...pForm, entidad: e.target.value })} /></Field>
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Monto original"><Input type="number" value={pForm.monto_original} onChange={(e) => setPForm({ ...pForm, monto_original: e.target.value })} /></Field>
+            <Field label="Monto original"><MoneyInput value={pForm.monto_original ? parseAR(pForm.monto_original) : 0} onChangeValue={(n) => setPForm({ ...pForm, monto_original: String(n) })} /></Field>
             <Field label="Cuotas totales"><Input type="number" value={pForm.cuotas_total} onChange={(e) => setPForm({ ...pForm, cuotas_total: e.target.value })} /></Field>
           </div>
           <Field label="Observaciones"><Textarea value={pForm.observaciones} onChange={(e) => setPForm({ ...pForm, observaciones: e.target.value })} /></Field>
@@ -147,9 +148,9 @@ export default function PrestamosPage() {
             <Field label="Vencimiento"><Input type="date" value={cForm.vencimiento} onChange={(e) => setCForm({ ...cForm, vencimiento: e.target.value })} /></Field>
           </div>
           <div className="grid grid-cols-3 gap-2">
-            <Field label="Capital"><Input type="number" value={cForm.capital} onChange={(e) => setCForm({ ...cForm, capital: e.target.value })} /></Field>
-            <Field label="Interés"><Input type="number" value={cForm.interes} onChange={(e) => setCForm({ ...cForm, interes: e.target.value })} /></Field>
-            <Field label="Otros"><Input type="number" value={cForm.otros} onChange={(e) => setCForm({ ...cForm, otros: e.target.value })} /></Field>
+            <Field label="Capital"><MoneyInput value={cForm.capital ? parseAR(cForm.capital) : 0} onChangeValue={(n) => setCForm({ ...cForm, capital: String(n) })} /></Field>
+            <Field label="Interés"><MoneyInput value={cForm.interes ? parseAR(cForm.interes) : 0} onChangeValue={(n) => setCForm({ ...cForm, interes: String(n) })} /></Field>
+            <Field label="Otros"><MoneyInput value={cForm.otros ? parseAR(cForm.otros) : 0} onChangeValue={(n) => setCForm({ ...cForm, otros: String(n) })} /></Field>
           </div>
           <Button className="w-full" onClick={crearCuota}>Agregar cuota</Button>
         </div>
