@@ -12,7 +12,7 @@ export default function MasIndex() {
   return (
     <div className="space-y-4">
       <h1 className="pt-2 font-display text-3xl font-semibold">Más</h1>
-      <div className="space-y-3">
+      <div className="space-y-5">
         {subs.map((s) => (
           <Link key={s.href} href={s.href}>
             <Card className="flex items-center gap-4 rise">
