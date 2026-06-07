@@ -12,7 +12,12 @@ export default async function AppLayout({ children }: { children: React.ReactNod
 
   return (
     <div className="mx-auto min-h-screen max-w-lg pb-24">
-      <main className="px-4 pt-4">{children}</main>
+      <main
+        className="px-4 pt-4"
+        style={{ paddingTop: "calc(env(safe-area-inset-top) + 1.5rem)" }}
+      >
+        {children}
+      </main>
       <BottomNav />
     </div>
   );
