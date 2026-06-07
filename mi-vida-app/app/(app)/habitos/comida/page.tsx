@@ -14,13 +14,15 @@ const TIPOS = [
   { v: "almuerzo", l: "Almuerzo" }, { v: "merienda", l: "Merienda" },
   { v: "cena", l: "Cena" }, { v: "colacion_nocturna", l: "Colación nocturna" },
 ];
+const vacio = () => ({ tipo_comida: "almuerzo", descripcion: "", calorias_est: "", calorias_corregidas: "" });
 
 export default function ComidaPage() {
   const supabase = createClient();
   const [fecha, setFecha] = useState(new Date().toISOString().slice(0, 10));
   const [comidas, setComidas] = useState<Comida[]>([]);
   const [open, setOpen] = useState(false);
-  const [form, setForm] = useState({ tipo_comida: "almuerzo", descripcion: "", calorias_est: "", calorias_corregidas: "" });
+  const [editId, setEditId] = useState<string | null>(null);
+  const [form, setForm] = useState(vacio());
   const [file, setFile] = useState<File | null>(null);
   const [estimando, setEstimando] = useState(false);
 
@@ -28,8 +30,18 @@ export default function ComidaPage() {
     const { data } = await supabase.from("comidas").select("*").eq("fecha", fecha).order("created_at");
     setComidas(data ?? []);
   }, [fecha, supabase]);
-
   useEffect(() => { load(); }, [load]);
+
+  function abrirNuevo() { setEditId(null); setForm(vacio()); setFile(null); setOpen(true); }
+  function abrirEdicion(c: Comida) {
+    setEditId(c.id);
+    setForm({
+      tipo_comida: c.tipo_comida, descripcion: c.descripcion ?? "",
+      calorias_est: c.calorias_est != null ? String(c.calorias_est) : "",
+      calorias_corregidas: c.calorias_corregidas != null ? String(c.calorias_corregidas) : "",
+    });
+    setFile(null); setOpen(true);
+  }
 
   async function fileToBase64(f: File): Promise<{ data: string; mediaType: string }> {
     return new Promise((res, rej) => {
@@ -59,16 +71,18 @@ export default function ComidaPage() {
       const { error } = await supabase.storage.from("comidas").upload(path, file);
       if (!error) foto_url = path;
     }
-    await supabase.from("comidas").insert({
-      user_id: user.id, fecha, tipo_comida: form.tipo_comida, descripcion: form.descripcion,
-      foto_url, calorias_est: form.calorias_est ? parseFloat(form.calorias_est) : null,
+    const payload: any = {
+      fecha, tipo_comida: form.tipo_comida, descripcion: form.descripcion,
+      calorias_est: form.calorias_est ? parseFloat(form.calorias_est) : null,
       calorias_corregidas: form.calorias_corregidas ? parseFloat(form.calorias_corregidas) : null,
-    });
-    setForm({ tipo_comida: "almuerzo", descripcion: "", calorias_est: "", calorias_corregidas: "" });
-    setFile(null); setOpen(false); load();
+    };
+    if (foto_url) payload.foto_url = foto_url;
+    if (editId) await supabase.from("comidas").update(payload).eq("id", editId);
+    else await supabase.from("comidas").insert({ user_id: user.id, ...payload });
+    setForm(vacio()); setFile(null); setEditId(null); setOpen(false); load();
   }
 
-  async function borrar(id: string) { await supabase.from("comidas").delete().eq("id", id); load(); }
+  async function borrar(e: React.MouseEvent, id: string) { e.stopPropagation(); await supabase.from("comidas").delete().eq("id", id); load(); }
 
   const total = comidas.reduce((a, c) => a + (c.calorias_corregidas ?? c.calorias_est ?? 0), 0);
 
@@ -76,7 +90,7 @@ export default function ComidaPage() {
     <div className="space-y-4">
       <header className="flex items-center justify-between pt-2">
         <h1 className="font-display text-3xl font-semibold">Comida</h1>
-        <Button onClick={() => setOpen(true)}>+ Cargar</Button>
+        <Button onClick={abrirNuevo}>+ Cargar</Button>
       </header>
 
       <Input type="date" value={fecha} onChange={(e) => setFecha(e.target.value)} />
@@ -85,20 +99,20 @@ export default function ComidaPage() {
       <div className="space-y-2">
         {comidas.length === 0 && <Empty>Sin comidas registradas este día.</Empty>}
         {comidas.map((c) => (
-          <Card key={c.id} className="flex items-center justify-between">
-            <div>
+          <Card key={c.id} className="flex items-center justify-between cursor-pointer">
+            <div className="flex-1" onClick={() => abrirEdicion(c)}>
               <div className="text-sm font-medium">{TIPOS.find((t) => t.v === c.tipo_comida)?.l}</div>
               <div className="text-xs" style={{ color: "var(--text-muted)" }}>{c.descripcion || "—"}</div>
             </div>
             <div className="flex items-center gap-3">
               <span className="text-sm font-semibold">{formatNum(c.calorias_corregidas ?? c.calorias_est ?? 0)} kcal</span>
-              <button onClick={() => borrar(c.id)} style={{ color: "var(--text-muted)" }}>🗑</button>
+              <button onClick={(e) => borrar(e, c.id)} style={{ color: "var(--text-muted)" }}>🗑</button>
             </div>
           </Card>
         ))}
       </div>
 
-      <Sheet open={open} onClose={() => setOpen(false)} title="Cargar comida">
+      <Sheet open={open} onClose={() => { setOpen(false); setEditId(null); }} title={editId ? "Editar comida" : "Cargar comida"}>
         <div className="space-y-3">
           <Field label="Tipo"><Select value={form.tipo_comida} onChange={(e) => setForm({ ...form, tipo_comida: e.target.value })}>{TIPOS.map((t) => <option key={t.v} value={t.v}>{t.l}</option>)}</Select></Field>
           <Field label="Descripción"><Textarea value={form.descripcion} onChange={(e) => setForm({ ...form, descripcion: e.target.value })} placeholder="Ej: milanesa con puré y ensalada" /></Field>
@@ -110,7 +124,7 @@ export default function ComidaPage() {
             <Field label="Calorías estimadas"><Input type="number" value={form.calorias_est} onChange={(e) => setForm({ ...form, calorias_est: e.target.value })} /></Field>
             <Field label="Corrección manual"><Input type="number" value={form.calorias_corregidas} onChange={(e) => setForm({ ...form, calorias_corregidas: e.target.value })} /></Field>
           </div>
-          <Button className="w-full" onClick={guardar}>Guardar</Button>
+          <Button className="w-full" onClick={guardar}>{editId ? "Guardar cambios" : "Guardar"}</Button>
         </div>
       </Sheet>
     </div>
