@@ -40,7 +40,6 @@ export default function ConfiguracionPage() {
     setMsg("Perfil guardado ✓"); setTimeout(() => setMsg(""), 2000);
   }
 
-  // Export completo a JSON (backup)
   async function exportar() {
     setExportando(true);
     try {
