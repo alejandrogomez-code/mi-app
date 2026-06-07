@@ -1,9 +1,10 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { createClient } from "@/lib/supabase/client";
-import { formatARS, formatUSD, formatFecha, nombreMes } from "@/lib/format";
+import { formatARS, formatUSD, formatFecha, nombreMes, parseAR } from "@/lib/format";
 import { generarCuotas } from "@/lib/calc";
 import { Card, Button, Field, Input, Select, Sheet, Empty, StatTile, SectionTitle, Badge } from "@/components/ui";
+import { MoneyInput } from "@/components/ui/MoneyInput";
 
 type Tarjeta = { id: string; nombre: string; emisor: string | null };
 type Cat = { id: string; nombre: string };
@@ -21,6 +22,8 @@ export default function TarjetasPage() {
   const [tarjetaSel, setTarjetaSel] = useState<string>("");
   const [consumos, setConsumos] = useState<Consumo[]>([]);
   const [openTar, setOpenTar] = useState(false);
+  const [editConsumo, setEditConsumo] = useState<Consumo | null>(null);
+  const [cForm, setCForm] = useState({ comercio_limpio: "", importe_ars: "", importe_usd: "", categoria_id: "", estado: "pendiente" });
   const [tarForm, setTarForm] = useState({ nombre: "", emisor: "Naranja X" });
   const [parseando, setParseando] = useState(false);
   const [preview, setPreview] = useState<any[] | null>(null);
@@ -111,11 +114,34 @@ export default function TarjetasPage() {
     setPreview(null); setParseInfo(null); loadConsumos();
   }
 
-  async function toggleEstado(c: Consumo) {
+  async function toggleEstado(e: React.MouseEvent, c: Consumo) {
+    e.stopPropagation();
     await supabase.from("consumos_tarjeta").update({ estado: c.estado === "pendiente" ? "pagado" : "pendiente" }).eq("id", c.id);
     loadConsumos();
   }
-  async function borrar(id: string) { await supabase.from("consumos_tarjeta").delete().eq("id", id); loadConsumos(); }
+  async function borrar(e: React.MouseEvent, id: string) { e.stopPropagation(); await supabase.from("consumos_tarjeta").delete().eq("id", id); loadConsumos(); }
+
+  function abrirEdicionConsumo(c: Consumo) {
+    setEditConsumo(c);
+    setCForm({
+      comercio_limpio: c.comercio_limpio || c.comercio || "",
+      importe_ars: c.importe_ars != null ? String(c.importe_ars) : "",
+      importe_usd: c.importe_usd != null ? String(c.importe_usd) : "",
+      categoria_id: c.categoria_id ?? "",
+      estado: c.estado,
+    });
+  }
+  async function guardarConsumo() {
+    if (!editConsumo) return;
+    await supabase.from("consumos_tarjeta").update({
+      comercio_limpio: cForm.comercio_limpio,
+      importe_ars: cForm.importe_ars ? parseAR(cForm.importe_ars) : null,
+      importe_usd: cForm.importe_usd ? parseAR(cForm.importe_usd) : null,
+      categoria_id: cForm.categoria_id || null,
+      estado: cForm.estado,
+    }).eq("id", editConsumo.id);
+    setEditConsumo(null); loadConsumos();
+  }
 
   // Proyección por mes de impacto
   const porMes = (() => {
@@ -179,8 +205,8 @@ export default function TarjetasPage() {
           <div className="space-y-2">
             {consumos.length === 0 && <Empty>Sin consumos. Importá un resumen.</Empty>}
             {consumos.map((c) => (
-              <Card key={c.id} className="flex items-center justify-between">
-                <div className="flex-1">
+              <Card key={c.id} className="flex items-center justify-between cursor-pointer">
+                <div className="flex-1" onClick={() => abrirEdicionConsumo(c)}>
                   <div className="text-sm font-medium">{c.comercio_limpio || c.comercio}</div>
                   <div className="text-xs" style={{ color: "var(--text-muted)" }}>
                     {formatFecha(c.fecha)}
@@ -194,16 +220,29 @@ export default function TarjetasPage() {
                     {c.moneda === "USD" && c.importe_usd ? <div className="text-sm font-semibold">{formatUSD(c.importe_usd)}</div> : null}
                     {c.importe_ars ? <div className="text-xs" style={{ color: "var(--text-muted)" }}>{formatARS(c.importe_ars)}</div> : null}
                   </div>
-                  <button onClick={() => toggleEstado(c)}>
+                  <button onClick={(e) => toggleEstado(e, c)}>
                     <Badge tone={c.estado === "pagado" ? "ok" : "warn"}>{c.estado}</Badge>
                   </button>
-                  <button onClick={() => borrar(c.id)} style={{ color: "var(--text-muted)" }}>🗑</button>
+                  <button onClick={(e) => borrar(e, c.id)} style={{ color: "var(--text-muted)" }}>🗑</button>
                 </div>
               </Card>
             ))}
           </div>
         </>
       )}
+
+      <Sheet open={!!editConsumo} onClose={() => setEditConsumo(null)} title="Editar consumo">
+        <div className="space-y-3">
+          <Field label="Comercio"><Input value={cForm.comercio_limpio} onChange={(e) => setCForm({ ...cForm, comercio_limpio: e.target.value })} /></Field>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="Importe ARS"><MoneyInput value={cForm.importe_ars ? parseAR(cForm.importe_ars) : 0} onChangeValue={(n) => setCForm({ ...cForm, importe_ars: String(n) })} /></Field>
+            <Field label="Importe USD"><Input type="number" value={cForm.importe_usd} onChange={(e) => setCForm({ ...cForm, importe_usd: e.target.value })} /></Field>
+          </div>
+          <Field label="Categoría"><Select value={cForm.categoria_id} onChange={(e) => setCForm({ ...cForm, categoria_id: e.target.value })}><option value="">Sin categoría</option>{cats.map((cat) => <option key={cat.id} value={cat.id}>{cat.nombre}</option>)}</Select></Field>
+          <Field label="Estado"><Select value={cForm.estado} onChange={(e) => setCForm({ ...cForm, estado: e.target.value })}><option value="pendiente">Pendiente</option><option value="pagado">Pagado</option></Select></Field>
+          <Button className="w-full" onClick={guardarConsumo}>Guardar cambios</Button>
+        </div>
+      </Sheet>
 
       <Sheet open={openTar} onClose={() => setOpenTar(false)} title="Nueva tarjeta">
         <div className="space-y-3">
