@@ -14,7 +14,7 @@ export default function MasIndex() {
       <h1 className="pt-2 font-display text-3xl font-semibold">Más</h1>
       <div className="space-y-5">
         {subs.map((s) => (
-          <Link key={s.href} href={s.href}>
+          <Link key={s.href} href={s.href} className="block">
             <Card className="flex items-center gap-4 rise">
               <span className="text-3xl">{s.icon}</span>
               <div>
