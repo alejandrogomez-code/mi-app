@@ -17,6 +17,7 @@ export default function SituacionPage() {
   const [movs, setMovs] = useState<Mov[]>([]);
   const [openMov, setOpenMov] = useState(false);
   const [openCta, setOpenCta] = useState(false);
+  const [editMovId, setEditMovId] = useState<string | null>(null);
   const [form, setForm] = useState({ fecha: new Date().toISOString().slice(0,10), cuenta_id: "", tipo: "gasto", categoria_id: "", importe: "", observacion: "" });
   const [ctaForm, setCtaForm] = useState({ nombre: "", tipo: "cuenta", saldo_actual: "" });
 
@@ -30,16 +31,32 @@ export default function SituacionPage() {
   }, [mes, supabase]);
   useEffect(() => { load(); }, [load]);
 
+  function abrirNuevoMov() {
+    setEditMovId(null);
+    setForm({ fecha: new Date().toISOString().slice(0,10), cuenta_id: "", tipo: "gasto", categoria_id: "", importe: "", observacion: "" });
+    setOpenMov(true);
+  }
+  function abrirEdicionMov(m: Mov) {
+    setEditMovId(m.id);
+    setForm({
+      fecha: m.fecha, cuenta_id: m.cuenta_id ?? "", tipo: m.tipo,
+      categoria_id: m.categoria_id ?? "", importe: String(m.importe), observacion: m.observacion ?? "",
+    });
+    setOpenMov(true);
+  }
+
   async function guardarMov() {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user || !form.importe) return;
-    await supabase.from("movimientos").insert({
-      user_id: user.id, fecha: form.fecha, cuenta_id: form.cuenta_id || null, tipo: form.tipo,
+    const payload = {
+      fecha: form.fecha, cuenta_id: form.cuenta_id || null, tipo: form.tipo,
       categoria_id: form.categoria_id || null, importe: parseFloat(form.importe),
       mes_imputado: mes, observacion: form.observacion,
-    });
+    };
+    if (editMovId) await supabase.from("movimientos").update(payload).eq("id", editMovId);
+    else await supabase.from("movimientos").insert({ user_id: user.id, ...payload });
     setForm({ fecha: new Date().toISOString().slice(0,10), cuenta_id: "", tipo: "gasto", categoria_id: "", importe: "", observacion: "" });
-    setOpenMov(false); load();
+    setEditMovId(null); setOpenMov(false); load();
   }
   async function guardarCta() {
     const { data: { user } } = await supabase.auth.getUser();
@@ -86,7 +103,7 @@ export default function SituacionPage() {
     <div className="space-y-4">
       <header className="flex items-center justify-between pt-2">
         <h1 className="font-display text-3xl font-semibold">Situación</h1>
-        <Button onClick={() => setOpenMov(true)}>+ Movimiento</Button>
+        <Button onClick={abrirNuevoMov}>+ Movimiento</Button>
       </header>
 
       <div className="grid grid-cols-3 gap-3">
@@ -143,8 +160,8 @@ export default function SituacionPage() {
       <div className="space-y-2">
         {movs.length === 0 && <Empty>Sin movimientos este mes.</Empty>}
         {movs.map((m) => (
-          <Card key={m.id} className="flex items-center justify-between">
-            <div>
+          <Card key={m.id} className="flex items-center justify-between cursor-pointer">
+            <div className="flex-1" onClick={() => abrirEdicionMov(m)}>
               <div className="text-sm font-medium">{cats.find((c) => c.id === m.categoria_id)?.nombre ?? m.tipo}</div>
               <div className="text-xs" style={{ color: "var(--text-muted)" }}>{m.observacion || cuentas.find((c) => c.id === m.cuenta_id)?.nombre || "—"}</div>
             </div>
@@ -152,13 +169,13 @@ export default function SituacionPage() {
               <span className="text-sm font-semibold" style={{ color: m.tipo === "ingreso" ? "var(--ok)" : m.tipo === "gasto" ? "var(--danger)" : "var(--text)" }}>
                 {m.tipo === "gasto" ? "-" : "+"}{formatARS(m.importe)}
               </span>
-              <button onClick={() => borrarMov(m.id)} style={{ color: "var(--text-muted)" }}>🗑</button>
+              <button onClick={(e) => { e.stopPropagation(); borrarMov(m.id); }} style={{ color: "var(--text-muted)" }}>🗑</button>
             </div>
           </Card>
         ))}
       </div>
 
-      <Sheet open={openMov} onClose={() => setOpenMov(false)} title="Cargar movimiento">
+      <Sheet open={openMov} onClose={() => { setOpenMov(false); setEditMovId(null); }} title={editMovId ? "Editar movimiento" : "Cargar movimiento"}>
         <div className="space-y-3">
           <Field label="Fecha"><Input type="date" value={form.fecha} onChange={(e) => setForm({ ...form, fecha: e.target.value })} /></Field>
           <Field label="Tipo"><Select value={form.tipo} onChange={(e) => setForm({ ...form, tipo: e.target.value, categoria_id: "" })}><option value="ingreso">Ingreso</option><option value="gasto">Gasto</option><option value="ahorro">Ahorro</option><option value="transferencia">Transferencia</option></Select></Field>
@@ -166,7 +183,7 @@ export default function SituacionPage() {
           <Field label="Categoría"><Select value={form.categoria_id} onChange={(e) => setForm({ ...form, categoria_id: e.target.value })}><option value="">—</option>{catsTipo(form.tipo).map((c) => <option key={c.id} value={c.id}>{c.nombre}</option>)}</Select></Field>
           <Field label="Importe"><MoneyInput value={form.importe ? parseAR(form.importe) : 0} onChangeValue={(n) => setForm({ ...form, importe: String(n) })} /></Field>
           <Field label="Observación"><Input value={form.observacion} onChange={(e) => setForm({ ...form, observacion: e.target.value })} /></Field>
-          <Button className="w-full" onClick={guardarMov}>Guardar</Button>
+          <Button className="w-full" onClick={guardarMov}>{editMovId ? "Guardar cambios" : "Guardar"}</Button>
         </div>
       </Sheet>
 
